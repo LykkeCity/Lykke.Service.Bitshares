@@ -222,7 +222,7 @@ class LykkeHttpHandler(HTTPHandler):
 
 def set_global_logger(existing_loggers=None):
     use_handlers = []
-    
+
     # setup logging
     log_level = logging.getLevelName(Config.get("logs", "level", default="INFO"))
     log_format = ('%(asctime)s %(levelname) -10s: %(message)s')
