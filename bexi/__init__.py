@@ -205,13 +205,19 @@ class LykkeHttpHandler(HTTPHandler):
 
         return record_dict
 
-    def emit(self, record):
-        def super_emit():
-            super(LykkeHttpHandler, self).emit(record)
+    def update_blocking(self):
+        self.blocking = Config.get("logs", "http", "blocking", False)
 
-        thread = threading.Thread(target=super_emit)
-        thread.daemon = True
-        thread.start()
+    def emit(self, record):
+        if self.blocking:
+            super(LykkeHttpHandler, self).emit(record)
+        else:
+            def super_emit():
+                super(LykkeHttpHandler, self).emit(record)
+
+            thread = threading.Thread(target=super_emit)
+            thread.daemon = True
+            thread.start()
 
 
 def set_global_logger(existing_loggers=None):
@@ -233,7 +239,7 @@ def set_global_logger(existing_loggers=None):
         trfh.suffix = "%Y-%m-%d"
         trfh.setFormatter(logging.Formatter(log_format))
         trfh.setLevel(log_level)
-    
+
         use_handlers.append(trfh)
 
     # ... and to console
@@ -252,6 +258,7 @@ def set_global_logger(existing_loggers=None):
             secure=Config.get("logs", "http", "secure")
         )
         lhh.setLevel(log_level)
+        lhh.update_blocking()
         use_handlers.append(lhh)
 
     # global config (e.g. for werkzeug)
