@@ -25,7 +25,7 @@ from ...connection import requires_blockchain
 from ... import Config, factory
 from ... import utils
 from ...operation_storage import operation_formatter
-from ...operation_storage.exceptions import InputInvalidException, InvalidOperationIdException
+from ...operation_storage.exceptions import InputInvalidException, InvalidOperationIdException, DuplicateOperationException, OperationNotFoundException
 
 from bitsharesapi.exceptions import UnhandledRPCError
 from bitshares.wallet import Wallet
@@ -234,7 +234,7 @@ def build_transaction(incidentId, fromAddress, fromMemoWif, toAddress, asset_id,
     """
 
     def obtain_raw_tx():
-#         if old_operation is None:
+        # if old_operation is None:
         _memo = memo.encrypt(memo_plain)
         _expiration = Config.get("bitshares", "transaction_expiration_in_sec", 60 * 60 * 24)  # 24 hours
 #         else:
@@ -270,12 +270,12 @@ def build_transaction(incidentId, fromAddress, fromMemoWif, toAddress, asset_id,
     if not is_valid_address(toAddress):
         raise AccountDoesNotExistsException()
 
-#     # check if this was already built
-#     old_operation = None
-#     try:
-#         old_operation = _get_os().get_operation(incidentId)
-#     except OperationNotFoundException:
-#         pass
+    # check if this was already broadcasted
+    try:
+        _get_os().get_operation(incidentId)
+        raise DuplicateOperationException()
+    except OperationNotFoundException:
+        pass
 
     # Decode addresses
     from_address = split_unique_address(fromAddress)
@@ -400,13 +400,13 @@ def broadcast_transaction(signed_transaction, bitshares_instance=None):
                 return {"hash": "no_id_given", "block": -1}
         except UnhandledRPCError as e:
             if "insufficient_balance" in str(e):
-                raise NotEnoughBalanceException()
+                exception_occured = NotEnoughBalanceException()
             elif "amount.amount > 0" in str(e):
-                raise AmountTooSmallException()
+                exception_occured = AmountTooSmallException()
             elif "now <= trx.expiration" in str(e):
-                raise TransactionExpiredException()
+                exception_occured = TransactionExpiredException()
             else:
-                raise e
+                exception_occured = e
         except Exception as e:
             exception_occured = e
 
