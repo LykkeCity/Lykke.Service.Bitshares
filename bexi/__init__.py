@@ -227,6 +227,8 @@ def set_global_logger(existing_loggers=None):
     log_level = logging.getLevelName(Config.get("logs", "level", default="INFO"))
     log_format = ('%(asctime)s %(levelname) -10s: %(message)s')
 
+    logging.addLevelName(25, "MONITOR")
+
     if Config.get("logs", "file", True):
         # ... log to file system
         log_folder = os.path.join(Config.get("dump_folder", default="dump"), "logs")

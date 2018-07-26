@@ -125,7 +125,7 @@ class AzureOperationsStorage(BasicOperationStorage):
             time.sleep(0.1)
 
     def _create_operations_storage(self, purge):
-        self._operation_varients = ["incident", "statuscompleted", "statusfailed", "statusinprogress"]  #  "customer"
+        self._operation_varients = ["incident", "statuscompleted", "statusfailed", "statusinprogress", "persistent"]  #  "customer"
         self._operation_tables = {}
         for variant in self._operation_varients:
             self._operation_tables[variant] = self._azure_config["operation_table"] + variant
@@ -150,6 +150,10 @@ class AzureOperationsStorage(BasicOperationStorage):
             "incident": lambda op: {
                 "PartitionKey": self._short_digit_hash(op["incident_id"]),
                 "RowKey": op["incident_id"]
+            },
+            "persistent": lambda op: {
+                "PartitionKey": self._short_digit_hash(op["incident_id"]),
+                "RowKey": op["incident_id"]
             }
         }
         for variant in self._operation_varients:
@@ -166,6 +170,8 @@ class AzureOperationsStorage(BasicOperationStorage):
             while not self._service.exists(self._operation_tables[variant]):
                 self._service.create_table(self._operation_tables[variant])
                 time.sleep(0.1)
+        # persistent table is special as it only adds operations after broadcast and never gets deleted
+        self._operation_varients = ["incident", "statuscompleted", "statusfailed", "statusinprogress"]
 
     def _get_with_ck(self, variant, operation):
         with_ck = operation.copy()
@@ -305,6 +311,38 @@ class AzureOperationsStorage(BasicOperationStorage):
                 )
         except AzureConflictHttpError:
             raise DuplicateOperationException()
+
+    def _insert_persistent(self, operation):
+        try:
+            variant = "persistent"
+            to_insert = self._get_with_ck(variant, {
+                "incident_id": operation["incident_id"]
+            })
+            if not operation["PartitionKey"]:
+                raise AzureMissingResourceHttpError()
+            if not operation["RowKey"]:
+                raise AzureMissingResourceHttpError()
+
+            logging.getLogger(__name__).debug("_insert_persistent: Table " + self._operation_tables[variant] + " PartitionKey " + to_insert["PartitionKey"] + " " + to_insert["RowKey"])
+            self._service.insert_entity(
+                self._operation_tables[variant],
+                to_insert
+            )
+        except AzureConflictHttpError:
+            raise DuplicateOperationException()
+
+    def _get_persitent(self, incident_id):
+        short_hash = self._short_digit_hash(incident_id)
+        logging.getLogger(__name__).debug("_get_persitent with " + str(incident_id) + ", hash " + str(short_hash))
+        operation = self._service.get_entity(
+            self._operation_tables["persistent"],
+            short_hash,
+            incident_id)
+        operation.pop("PartitionKey")
+        operation.pop("RowKey")
+        operation.pop("Timestamp")
+        operation.pop("etag")
+        return operation
 
     def _delete(self, operation):
         try:
@@ -476,6 +514,9 @@ class AzureOperationsStorage(BasicOperationStorage):
             except AzureConflictHttpError:
                 raise OperationStorageException("Critical error in database consistency")
 
+        # insert into persistent operation to disallow rebuilding
+        self._insert_persistent(operation)
+
     @retry_auto_reconnect
     def insert_or_update_operation(self, operation):
         # do basics
@@ -577,7 +618,11 @@ class AzureOperationsStorage(BasicOperationStorage):
             operation.pop("Timestamp")
             operation.pop("etag")
         except AzureMissingResourceHttpError:
-            raise OperationNotFoundException()
+            # might be a persistent operation
+            try:
+                return self._get_persitent(incident_id)
+            except AzureMissingResourceHttpError:
+                raise OperationNotFoundException()
         return operation
 
     @retry_auto_reconnect
