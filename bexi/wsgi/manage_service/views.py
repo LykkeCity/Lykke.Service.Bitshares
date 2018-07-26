@@ -269,6 +269,8 @@ def build_transaction():
         custom_abort(400)
     except InvalidOperationIdException:
         custom_abort(400)
+    except DuplicateOperationException:
+        custom_abort(409)
 
 
 @blueprint_manage_service.route("/api/transactions/broadcast", methods=["POST"])
@@ -291,7 +293,7 @@ def broadcast_transaction():
     except DuplicateOperationException:
         custom_abort(409)
     except TransactionExpiredException:
-        custom_abort(400, "transactionExpired")
+        custom_abort(400, "buildingShouldBeRepeated")
     except JSONDecodeError:
         custom_abort(400)
 

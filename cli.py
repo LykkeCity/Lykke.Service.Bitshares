@@ -29,7 +29,7 @@ def wsgi(host, port):
 
     app = get_manage_service_app()
     app = get_sign_service_app(app)
-    app.logger.info("Starting " + config["name"] + " with manage and sign service ...")
+    app.logger.log(25, "Starting " + config["name"] + " with manage and sign service ...")
     app.run(host=host, port=port, debug=True)
 
 
@@ -43,7 +43,7 @@ def sign_service(host, port):
     from bexi.wsgi.app import get_sign_service_app
 
     app = get_sign_service_app()
-    app.logger.info("Starting " + config["name"] + " sign service ...")
+    app.logger.log(25, "Starting " + config["name"] + " sign service ...")
     app.run(host=host, port=port)
 
 
@@ -57,7 +57,7 @@ def manage_service(host, port):
     from bexi.wsgi.app import get_manage_service_app
 
     app = get_manage_service_app()
-    app.logger.info("Starting " + config["name"] + " manage service ...")
+    app.logger.log(25, "Starting " + config["name"] + " manage service ...")
     app.run(host=host, port=port)
 
 
@@ -72,12 +72,10 @@ def blockchain_monitor_service(host, port):
 
     app = get_blockchain_monitor_service_app()
 
-    logging.getLogger(__name__).info("Starting BitShares blockchain monitor as coroutines ...")
-
     thr = threading.Thread(target=start_block_monitor, daemon=True)
     thr.start()  # run in background
 
-    app.logger.info("Starting " + config["name"] + " blockchain monitor service ...")
+    app.logger.log(25, "Starting " + config["name"] + " blockchain monitor service, blockchain monitor as coroutines ...")
     app.run(host=host, port=port)
 
 
@@ -89,7 +87,7 @@ def only_blockchain_monitor(start, stop):
                  "config_bitshares_memo_keys.yaml",
                  "config_bitshares.yaml",
                  "config_operation_storage.yaml"])
-    logging.getLogger(__name__).info("Starting BitShares blockchain monitor ...")
+    logging.getLogger(__name__).log(25, "Starting BitShares blockchain monitor ...")
     start_block_monitor(start, stop)
 
 
@@ -103,7 +101,7 @@ def only_blockchain_monitor_service(host, port):
     from bexi.wsgi.app import get_blockchain_monitor_service_app
 
     app = get_blockchain_monitor_service_app()
-    app.logger.info("Starting " + config["name"] + " blockchain monitor service ...")
+    app.logger.log(25, "Starting " + config["name"] + " blockchain monitor service ...")
     app.run(host=host, port=port)
 
 
