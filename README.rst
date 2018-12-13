@@ -87,3 +87,22 @@ and the manage service (buil and broadcast transactions, manage balances, histor
 .. code-block:: bash
 
 	$ python3 cli.py manage_service
+	
+Check memo
+-------------------------------
+.. code-block:: bash
+
+memokey="*";
+bitshares = BitShares(
+                node = ["wss://bitshares.nu/ws"],
+                keys=[memokey]
+            )
+#http://bitshares-explorer.io/#/operations/1.11.624420807  		
+memo1 ={'from':'BTS7vxT22wpnBPRA9V6cyVNUkFApqrR9t4gpanFmWyLAEXbhX4iv4', 'message':'6430d1dd4e65b1e8ff56e6a8b8eae13e3fa0075f12f0e288a98a23028f0024bd6b3f62c7dba8b6e8d6ca084ca14465eb', 'nonce':'6486727705420643899', 'to':'BTS5rsVrrJ2HagAyTBF5w1nuNB2QScZidWwU8SYb2V9GaWaB7shGQ'}
+  
+decoded_memo1 = Memo(
+                bitshares_instance=bitshares
+            ).decrypt(memo1)  
+      
+print('"'+decoded_memo1+'"')
+
