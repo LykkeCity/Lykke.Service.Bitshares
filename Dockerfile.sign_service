@@ -1,6 +1,4 @@
-FROM python:3.5-stretch
-
-RUN python3 --version
+FROM python:3
  
 # Create app directory
 RUN mkdir /app
