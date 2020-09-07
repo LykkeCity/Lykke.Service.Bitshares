@@ -7,6 +7,7 @@ import io
 import urllib.request
 import collections
 import json
+import threading
 
 
 def get_version():
@@ -66,7 +67,9 @@ class Config(dict):
         else:
             stream = urllib.request.urlopen(urllib.parse.urlparse(file_or_url).geturl())
             with stream:
-                Config._nested_update(Config.data, json.loads(stream.read()))
+                jsonConfig = json.loads(stream.read())
+                logging.getLogger(__name__).debug("Json config: " + jsonConfig))
+                Config._nested_update(Config.data, jsonConfig)
             Config.source = file_or_url
 
         # check if a private key was given, and overwrite existing ones then
@@ -180,6 +183,7 @@ class Config(dict):
             if isinstance(v, collections.Mapping):
                 d[k] = Config._nested_update(d.get(k, {}), v)
             else:
+                logging.getLogger(__name__).debug("Config[" + k + "]=" + v)
                 d[k] = v
         return d
 
@@ -204,30 +208,49 @@ class LykkeHttpHandler(HTTPHandler):
 
         return record_dict
 
+    def update_blocking(self):
+        self.blocking = Config.get("logs", "http", "blocking", True)
+
+    def emit(self, record):
+        if self.blocking:
+            super(LykkeHttpHandler, self).emit(record)
+        else:
+            def super_emit():
+                super(LykkeHttpHandler, self).emit(record)
+
+            thread = threading.Thread(target=super_emit)
+            thread.daemon = True
+            thread.start()
+
 
 def set_global_logger(existing_loggers=None):
-    # setup logging
-    # ... log to file system
-    log_folder = os.path.join(Config.get("dump_folder", default="dump"), "logs")
-    log_level = logging.getLevelName(Config.get("logs", "level", default="INFO"))
+    use_handlers = []
 
-    os.makedirs(log_folder, exist_ok=True)
+    # setup logging
+    log_level = logging.getLevelName(Config.get("logs", "level", default="INFO"))
     log_format = ('%(asctime)s %(levelname) -10s: %(message)s')
-    trfh = TimedRotatingFileHandler(
-        os.path.join(log_folder, "bexi.log"),
-        "midnight",
-        1
-    )
-    trfh.suffix = "%Y-%m-%d"
-    trfh.setFormatter(logging.Formatter(log_format))
-    trfh.setLevel(log_level)
+
+    if Config.get("logs", "file", True):
+        # ... log to file system
+        log_folder = os.path.join(Config.get("dump_folder", default="dump"), "logs")
+        os.makedirs(log_folder, exist_ok=True)
+        trfh = TimedRotatingFileHandler(
+            os.path.join(log_folder, "bexi.log"),
+            "midnight",
+            1
+        )
+        trfh.suffix = "%Y-%m-%d"
+        trfh.setFormatter(logging.Formatter(log_format))
+        trfh.setLevel(log_level)
+
+        use_handlers.append(trfh)
 
     # ... and to console
     sh = logging.StreamHandler()
     sh.setFormatter(logging.Formatter(log_format))
     sh.setLevel(log_level)
 
-    use_handlers = [trfh, sh]
+    use_handlers.append(sh)
 
     if not Config.get("logs", "http", {}) == {}:
         # ... and http logger
@@ -238,6 +261,7 @@ def set_global_logger(existing_loggers=None):
             secure=Config.get("logs", "http", "secure")
         )
         lhh.setLevel(log_level)
+        lhh.update_blocking()
         use_handlers.append(lhh)
 
     # global config (e.g. for werkzeug)

@@ -1,4 +1,4 @@
-from ..operation_storage.exceptions import DuplicateOperationException
+from ..operation_storage.exceptions import DuplicateOperationException, OperationStorageBadRequestException
 from ..factory import get_operation_storage
 from ..connection import requires_blockchain
 from .. import Config
@@ -79,7 +79,7 @@ class BlockchainMonitor(object):
         # make sure the memo key is added to the instance
         memo_key = Config.get("bitshares", "exchange_account_memo_key")
         if not self.bitshares.wallet.created() or\
-                memo_key in self.bitshares.wallet.keys:
+                memo_key not in self.bitshares.wallet.keys:
             self.bitshares.wallet.setKeys(memo_key)
 
         # Get configuration
@@ -345,3 +345,6 @@ class BlockchainMonitor(object):
             self.storage.insert_or_update_operation(operation)
         except DuplicateOperationException:
             logging.getLogger(__name__).debug("Storage already contained operation, skipping ...")
+        except OperationStorageBadRequestException as e:
+            logging.getLogger(__name__).debug("Storage gave bad request, exception below. Skipping ...")
+            logging.getLogger(__name__).exception(e)
