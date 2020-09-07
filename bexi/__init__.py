@@ -67,7 +67,9 @@ class Config(dict):
         else:
             stream = urllib.request.urlopen(urllib.parse.urlparse(file_or_url).geturl())
             with stream:
-                Config._nested_update(Config.data, json.loads(stream.read()))
+                jsonConfig = json.loads(stream.read())
+                logging.getLogger(__name__).debug("Json config: " + jsonConfig))
+                Config._nested_update(Config.data, jsonConfig)
             Config.source = file_or_url
 
         # check if a private key was given, and overwrite existing ones then
@@ -181,6 +183,7 @@ class Config(dict):
             if isinstance(v, collections.Mapping):
                 d[k] = Config._nested_update(d.get(k, {}), v)
             else:
+                logging.getLogger(__name__).debug("Config[" + k + "]=" + v)
                 d[k] = v
         return d
 
